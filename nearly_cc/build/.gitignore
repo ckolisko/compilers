@@ -1,0 +1,5 @@
+/*.o
+/*.cpp
+/*.h
+/parse.output
+/test_*
