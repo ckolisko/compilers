@@ -42,6 +42,11 @@ private:
   // TODO: fields (pointer to Type, pointer to Symbol, etc.)
   Symbol* sym_ptr;
 
+  bool isDefiner = false;
+
+  // This is only for declarators
+  std::shared_ptr<Type> parent_type;
+
   // copy ctor and assignment operator not supported
   NodeBase(const NodeBase &);
   NodeBase &operator=(const NodeBase &);
@@ -53,13 +58,31 @@ public:
   void setSymbol( Symbol* sym_ptr){
     this->sym_ptr = sym_ptr;
   }
-      
+
   void setSymbol(SymbolKind kind, const std::string &name, std::shared_ptr<Type> type, SymbolTable *symtab);        
 
   Symbol* getSymbol();
   std::shared_ptr<Type> getType();
 
-  // TODO: add member functions
+  void setDefiner(bool def){
+    isDefiner = def;
+  }
+  bool getDefiner(){
+    return isDefiner;
+  }
+
+  // Set the type of the parent node, for declarators only.
+  void setDecType(std::shared_ptr<Type> parent_type){
+    this->parent_type = parent_type;
+  }
+  std::shared_ptr<Type> getDecType(){
+    return this->parent_type;
+  }
+
+  bool hasArrayChild = false;
+  bool hasPointerParent = false;
+  std::vector<Member> structMembers;
+
 };
 
 #endif // NODE_BASE_H

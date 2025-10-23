@@ -83,8 +83,8 @@ private:
   //! Return to the parent of the current scope.
   void leave_scope();
 
+  void checkRedef(Node* n);
   // TODO: add helper functions
-  
 };
 
 #endif // SEMANTIC_ANALYSIS_H
