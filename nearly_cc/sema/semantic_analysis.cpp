@@ -289,7 +289,7 @@ state getEndState(Node* n, len *length, bool *signVal, bool hasQual){
     // In any order.
     int startIndex = 0;
     if (hasQual && numKids < 2) {
-      SemanticError(n->get_loc(), "invalid basic type");
+      SemanticError::raise(n->get_loc(), "invalid basic type");
     } else if (hasQual){
       startIndex = 1;
     }
@@ -465,13 +465,13 @@ void SemanticAnalysis::checkRedef(Node *n){
   
   std::shared_ptr<Type> baseType = n->get_kid(0)->getType();
   if (baseType.get()->get_basic_type_kind() != this->m_cur_symtab->get_fn_type().get()->get_base_type().get()->get_basic_type_kind() ){
-    SemanticError(n->get_loc(), "Non matching return types.");
+    SemanticError::raise(n->get_loc(), "Non matching return types.");
   }
 
   // Check the number of params.
   unsigned numKids = n->get_kid(2)->get_num_kids();
   if (numKids != this->m_cur_symtab->get_num_parameters() ) {
-    SemanticError(n->get_loc(), "Non matching number of parameters.");
+    SemanticError::raise(n->get_loc(), "Non matching number of parameters.");
   }
   
   SymbolTable * curTable = this->m_cur_symtab;
@@ -482,7 +482,7 @@ void SemanticAnalysis::checkRedef(Node *n){
     std::shared_ptr<Type> curType = paramNode->get_kid(i)->getType();
     std::shared_ptr<Type> tableType = curTable->get_fn_type().get()->get_member(i).get_type();
     if (curType.get()->get_basic_type_kind() != tableType.get()->get_basic_type_kind()) {
-      SemanticError(n->get_loc(), "Non matching parameters types.");
+      SemanticError::raise(n->get_loc(), "Non matching parameters types.");
     } 
   }
   // If the params matched up, great.
@@ -648,16 +648,133 @@ for (int i = 0; i < numKids; i++)
 this->leave_scope();
 }
 
-void SemanticAnalysis::visit_binary_expression(Node *n) {
-  // TODO: implement
+// Check if this symbol satisfies an lval.
+void checkLval(Node* n){
+Symbol * sym = n->getSymbol();
+
+if (!sym){ // If l is literal, error
+  std::string errorString = "Can't assign a value to a literal";
+  SemanticError::raise(n->get_loc(), "%s", errorString.c_str());
+}
+if (sym->get_type().get()->is_array()){
+  std::string errorString = "Can't assign to an array";
+  SemanticError::raise(n->get_loc(), "%s", errorString.c_str());
+}
+// Check if ref to var
+if (sym->get_type().get()->is_basic()){
+  return;
+}
+if (sym->get_type().get()->is_struct()){
+  return;
+}
+if (sym->get_type().get()->is_struct()){
+  return;
 }
 
+}
+
+// Checks if this assignment operation will be valid.
+void checkAssign (Node* n1, Node* n2){
+  // Check if left side is const. If yes, bad.
+  Symbol * sym1 = n1->getSymbol();
+  Symbol * sym2 = n2->getSymbol();
+
+  // Check Lval for validness.
+  checkLval(n1);
+
+  // If left side is literal, go handle that
+  if (sym2 == nullptr){
+    return;
+  }
+
+  //Special case for 2 pointers.
+  if (sym1->get_type().get()->is_pointer() ){
+    if (sym2->get_type().get()->is_pointer() || sym2->get_type().get()->is_array()){
+      //Check they have same unqualified base types.
+      if (sym1->get_type().get()->get_unqualified_type()->is_same(sym2->get_type().get()->get_unqualified_type())){
+        //Check if base on left has all quals right side has.
+        std::shared_ptr<Type> b1 = sym1->get_type().get()->get_base_type();
+        std::shared_ptr<Type> b2 = sym2->get_type().get()->get_base_type();
+        if (b2.get()->is_const()){
+          if (!b1.get()->is_const()){
+            SemanticError::raise(n1->get_loc(), "Right side is not const.");    
+          }
+        }
+        if (b2.get()->is_volatile()){
+          if (!b1.get()->is_volatile()){
+            SemanticError::raise(n1->get_loc(), "Right side is not volatile.");
+          }
+        }
+      }
+    } else {
+      SemanticError::raise(n1->get_loc(),"Can't assign a pointer and non-pointer");
+    }
+  }
+
+  // Okay now we just have nice variable values.
+  if(sym1->get_type().get()->is_const()) {
+    SemanticError::raise(n1->get_loc(), "CANNOT have const get assigned on left!");
+  }
+
+  // If we have struct on left
+
+
+}
+
+void SemanticAnalysis::visit_binary_expression(Node *n) {
+  // Do a little bit of error checking using the symbol table.
+  // First child is the expression, second var ref, third either literal or another ref.
+  int tokOp = n->get_kid(0)->get_tag();
+  // Lets visit the kids first to populate their types.
+  visit(n->get_kid(1));
+  visit(n->get_kid(2));
+
+  switch (tokOp)
+  {
+  case TOK_ASSIGN:
+    checkAssign(n->get_kid(1), n->get_kid(2));
+    break;
+  
+  default:
+    break;
+  }
+
+}
+
+
 void SemanticAnalysis::visit_unary_expression(Node *n) {
-  // TODO: implement
+  // Handle *, &, !, and -
+  // Get the op, handle seperately.
+  int tok = n->get_kid(0)->get_tag();
+  Node *kid = n->get_kid(1);
+  visit(kid);
+  switch (tok)
+  {
+  case TOK_ASTERISK: // Deref by one, if possible.
+    if (kid->getSymbol()->get_type().get()->is_pointer()){
+      std::shared_ptr<Type> base = kid->getSymbol()->get_type().get()->get_base_type();
+      n->setSymbol(kid->getSymbol()->get_kind(), base.get()->as_str(), base,this->m_cur_symtab);
+    } else {
+      SemanticError::raise(n->get_loc(), "Can't dereference non-pointer");
+    }
+  break;
+  case TOK_AMPERSAND: // Process, then wrap in pointer.
+  {  
+    std::shared_ptr<Type> base = std::shared_ptr<Type>( new PointerType(kid->getSymbol()->get_type()));
+    n->setSymbol(SymbolKind::VARIABLE, base.get()->as_str(), base, this->m_cur_symtab);
+    break;
+  } 
+//  case TOK_NOT: //  
+//    handleNot(n->get_kid(1));
+  case TOK_SUB_ASSIGN: // Check if int.
+    break;
+  
+  default:
+    break;
+  }
 }
 
 void SemanticAnalysis::visit_postfix_expression(Node *n) {
-  // TODO: implement
 }
 
 void SemanticAnalysis::visit_conditional_expression(Node *n) {
@@ -672,24 +789,66 @@ void SemanticAnalysis::visit_function_call_expression(Node *n) {
   // TODO: implement
 }
 
+// Like when you do f.x . Ref the x field in f. 
+// Lets look up f in the symbol table, then use that to process x.
+// End of day, we want to get x symbol.
+// But, can be points[i].x
 void SemanticAnalysis::visit_field_ref_expression(Node *n) {
-  // TODO: implement
+  visit(n->get_kid(0)); // Process struct or array.
+  // get matching member, check if we matche this.
+  
+  std::shared_ptr<Type> baseType;
+  baseType = n->get_kid(0)->getType();
+  
+
+  // Otherwise, it is a struct pretty much.
+  const Member* match = baseType.get()->find_member(n->get_kid(1)->get_str());
+  if (!match){ //No match
+    std::string errorString = "No field " + n->get_kid(1)->get_str() + " found in struct.";
+    SemanticError::raise(n->get_loc(), "%s", errorString.c_str());
+  }
+
+  // If there was match, great. Set type.
+  n->setSymbol(SymbolKind::VARIABLE, match->get_name(),match->get_type(),this->m_cur_symtab);
 }
 
+// This is for those v->s type things. Like above
 void SemanticAnalysis::visit_indirect_field_ref_expression(Node *n) {
-  // TODO: implement
+  visit(n->get_kid(0)); // Process struct or array pointer. f->d
+  // get matching member, check if we matches this.
+  std::shared_ptr<Type> baseType;
+  baseType = n->get_kid(0)->getType();
+  
+  // Crunch through pointer
+  std::shared_ptr<Type> ptrBaseType = baseType.get()->get_base_type();
+
+  // Now, just a struct.
+  const Member* match = ptrBaseType.get()->find_member(n->get_kid(1)->get_str());
+  if (!match){ //No match
+    std::string errorString = "No field " + n->get_kid(1)->get_str() + " found in struct.";
+    SemanticError::raise(n->get_loc(), "%s", errorString.c_str());
+  }
+
+  // If there was match, great. Set type.
+  n->setSymbol(SymbolKind::VARIABLE, match->get_name(),match->get_type(),this->m_cur_symtab);
 }
 
 void SemanticAnalysis::visit_array_element_ref_expression(Node *n) {
-  // TODO: implement
+  // Just like a regular var except we visit kids down to get the name back in symbol form.
+  visit(n->get_kid(0));
+  Symbol* sym = this->m_cur_symtab->lookup_recursive(n->get_kid(0)->getSymbol()->get_name());
+  std::shared_ptr<Type> base = sym->get_type().get()->get_base_type();
+  n->setSymbol(SymbolKind::VARIABLE, n->get_kid(0)->getSymbol()->get_name(), base, this->m_cur_symtab);
+  // CANNOT yank here. But I have to.
 }
 
 void SemanticAnalysis::visit_variable_ref(Node *n) {
-  // TODO: implement
+  // All we want to do is make sure it exists in the symbol table, and get the symbol.
+  n->setSymbol(this->m_cur_symtab->lookup_recursive(n->get_kid(0)->get_str()));
 }
 
 void SemanticAnalysis::visit_literal_value(Node *n) {
-  // TODO: implement
+  // Just want to confirm we here I guess idk.
 }
 
 SymbolTable *SemanticAnalysis::enter_scope(const std::string &name) {
