@@ -135,7 +135,7 @@ public:
   int get_depth() const;
 
 private:
-  // TODO: add helper functions
+  
 };
 
 #endif // SYMTAB_H

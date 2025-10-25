@@ -84,7 +84,12 @@ private:
   void leave_scope();
 
   void checkRedef(Node* n);
-  // TODO: add helper functions
+  Node* promote_to_int(Node *n);
+  Node* promote_to_long(Node *n);
+  Node* promote_to_unsigned(Node *n);
+  Node *implicit_conversion(Node *n, std::shared_ptr<Type> type);
+  void processLogical(Node *n);
+
 };
 
 #endif // SEMANTIC_ANALYSIS_H

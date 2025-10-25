@@ -81,7 +81,11 @@ public:
 
   bool hasArrayChild = false;
   bool hasPointerParent = false;
+  bool isArrayRef = false;
+  bool isStructRef = false;
+
   std::vector<Member> structMembers;
+  std::string curFuncName;
 
 };
 
