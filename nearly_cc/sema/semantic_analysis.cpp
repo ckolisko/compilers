@@ -623,7 +623,6 @@ void SemanticAnalysis::visit_function_declaration(Node *n) {
 // Process param list into a hasMembers type.
 // Make the sym table entries for them as well.
 void SemanticAnalysis::visit_function_parameter_list(Node *n) {
-  // TODO: implement
 }
 
 void SemanticAnalysis::visit_function_parameter(Node *n) {
@@ -942,11 +941,9 @@ void SemanticAnalysis::visit_postfix_expression(Node *n) {
 }
 
 void SemanticAnalysis::visit_conditional_expression(Node *n) {
-  // TODO: implement
 }
 
 void SemanticAnalysis::visit_cast_expression(Node *n) {
-  // TODO: implement
 }
 
 void SemanticAnalysis::visit_function_call_expression(Node *n) {
@@ -1096,4 +1093,3 @@ void SemanticAnalysis::leave_scope() {
   m_cur_symtab = m_cur_symtab->get_parent();
 }
 
-// TODO: implement helper functions

@@ -1,1 +1,0 @@
-The only feature I did not implement was using different names for parameters between the function declaration and definition. There is nothing particularly signifigant here, except there are some hacky work arounds for field references, mostly in the form of booleans in nodes which are set to know if the underlying type of the ref is an array.
